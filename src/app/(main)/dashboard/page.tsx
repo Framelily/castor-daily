@@ -47,21 +47,23 @@ export default function DashboardPage() {
     setLoading(false)
   }, [])
 
-  const handleGenerateTasks = useCallback(async () => {
+  const loadDashboard = useCallback(async () => {
+    setLoading(true)
     setGeneratingTasks(true)
-    const result = await generateDailyTasks()
-    if (!result.error && result.generated > 0) {
-      await fetchTasks()
-    }
+
+    // Generate tasks first (will skip if already generated today)
+    await generateDailyTasks()
     setGeneratingTasks(false)
+
+    // Then fetch tasks (parallel)
+    await fetchTasks()
   }, [fetchTasks])
 
   useEffect(() => {
     if (!authLoading) {
-      // Generate tasks first, then fetch
-      handleGenerateTasks().then(fetchTasks)
+      loadDashboard()
     }
-  }, [authLoading, handleGenerateTasks, fetchTasks])
+  }, [authLoading, loadDashboard])
 
   const handleToggleTask = async (task: Task) => {
     const newStatus = task.status === 'completed' ? 'pending' : 'completed'
