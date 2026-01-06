@@ -29,15 +29,20 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // IMPORTANT: Avoid writing any logic between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   const pathname = request.nextUrl.pathname
+
+  // Skip middleware for static files and API routes
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api') ||
+    pathname.includes('.') // static files like .js, .css, .png
+  ) {
+    return supabaseResponse
+  }
 
   // Public routes that don't require authentication
   const publicRoutes = ['/login', '/callback']
@@ -52,38 +57,13 @@ export async function updateSession(request: NextRequest) {
 
   // If user is logged in and trying to access login page
   if (user && pathname === '/login') {
-    // Check if onboarding is completed
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: profile } = await (supabase as any)
-      .from('profiles')
-      .select('onboarding_completed')
-      .eq('id', user.id)
-      .single()
-
     const url = request.nextUrl.clone()
-    if (!profile?.onboarding_completed) {
-      url.pathname = '/onboarding'
-    } else {
-      url.pathname = '/dashboard'
-    }
+    url.pathname = '/dashboard'
     return NextResponse.redirect(url)
   }
 
-  // If user is logged in but onboarding not completed
-  if (user && pathname !== '/onboarding' && pathname !== '/callback') {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: profile } = await (supabase as any)
-      .from('profiles')
-      .select('onboarding_completed')
-      .eq('id', user.id)
-      .single()
-
-    if (profile && !profile.onboarding_completed) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/onboarding'
-      return NextResponse.redirect(url)
-    }
-  }
+  // Only check onboarding status for main app routes (not for every request)
+  // The onboarding check will be handled client-side for better performance
 
   return supabaseResponse
 }

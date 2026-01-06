@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { User, Session } from '@supabase/supabase-js'
 import type { Profile } from '@/types/database'
@@ -21,6 +22,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const router = useRouter()
+  const pathname = usePathname()
 
   const supabase = createClient()
 
@@ -52,6 +55,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           const userProfile = await fetchProfile(session.user.id)
           setProfile(userProfile)
+
+          // Handle onboarding redirect client-side
+          const publicPaths = ['/login', '/callback', '/onboarding']
+          if (userProfile && !userProfile.onboarding_completed && !publicPaths.includes(pathname)) {
+            router.push('/onboarding')
+          }
         }
       } catch (error) {
         console.error('Error initializing auth:', error)
