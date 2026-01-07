@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -31,6 +31,7 @@ export default function RoutinesPage() {
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<TaskTemplateWithCategory | null>(null)
+  const hasInitialized = useRef(false)
 
   const fetchData = async () => {
     const [templatesResult, categoriesResult] = await Promise.all([
@@ -48,6 +49,9 @@ export default function RoutinesPage() {
   }
 
   useEffect(() => {
+    if (hasInitialized.current) return
+    hasInitialized.current = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData()
   }, [])
 

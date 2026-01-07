@@ -63,6 +63,7 @@ export function RoutineDialog({
 
   const isEditing = !!template
 
+  // Sync form state when template changes
   useEffect(() => {
     if (template) {
       setTitle(template.title)
@@ -94,7 +95,8 @@ export function RoutineDialog({
       setMonthlyDay(1)
     }
     setError(null)
-  }, [template, categories])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [template, open])
 
   const buildFrequencyConfig = (): FrequencyConfig => {
     switch (frequencyType) {

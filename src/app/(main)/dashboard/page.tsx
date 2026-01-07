@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { Progress } from '@/components/ui/progress'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -30,6 +30,7 @@ export default function DashboardPage() {
   const [showAddTask, setShowAddTask] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskSlot, setNewTaskSlot] = useState<TimeSlot>('anytime')
+  const hasInitialized = useRef(false)
 
   const greeting = getGreeting(profile?.timezone)
 
@@ -44,26 +45,28 @@ export default function DashboardPage() {
     if (!overdueResult.error) {
       setOverdueTasks(overdueResult.tasks)
     }
-    setLoading(false)
   }, [])
 
-  const loadDashboard = useCallback(async () => {
-    setLoading(true)
-    setGeneratingTasks(true)
-
-    // Generate tasks first (will skip if already generated today)
-    await generateDailyTasks()
-    setGeneratingTasks(false)
-
-    // Then fetch tasks (parallel)
-    await fetchTasks()
-  }, [fetchTasks])
-
   useEffect(() => {
-    if (!authLoading) {
-      loadDashboard()
+    if (authLoading || hasInitialized.current) return
+    hasInitialized.current = true
+
+    const loadDashboard = async () => {
+      setGeneratingTasks(true)
+      try {
+        await generateDailyTasks()
+        await fetchTasks()
+      } catch (error) {
+        console.error('Error loading dashboard:', error)
+      } finally {
+        setGeneratingTasks(false)
+        setLoading(false)
+      }
     }
-  }, [authLoading, loadDashboard])
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadDashboard()
+  }, [authLoading, fetchTasks])
 
   const handleToggleTask = async (task: Task) => {
     const newStatus = task.status === 'completed' ? 'pending' : 'completed'

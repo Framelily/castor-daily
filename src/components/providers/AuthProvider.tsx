@@ -27,14 +27,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const supabase = createClient()
 
-  const fetchProfile = async (userId: string) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (supabase as any)
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-    return data as Profile | null
+  const fetchProfile = async (userId: string): Promise<Profile | null> => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+
+      if (error) {
+        console.error('Error fetching profile:', error)
+        return null
+      }
+      return data as Profile | null
+    } catch (error) {
+      console.error('Error fetching profile:', error)
+      return null
+    }
   }
 
   const refreshProfile = async () => {
@@ -58,7 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           // Handle onboarding redirect client-side
           const publicPaths = ['/login', '/callback', '/onboarding']
-          if (userProfile && !userProfile.onboarding_completed && !publicPaths.includes(pathname)) {
+          const needsOnboarding = !userProfile || !userProfile.onboarding_completed
+          if (needsOnboarding && !publicPaths.includes(pathname)) {
             router.push('/onboarding')
           }
         }
