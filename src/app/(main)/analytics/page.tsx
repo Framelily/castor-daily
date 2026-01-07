@@ -67,7 +67,7 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg p-4 pb-24">
+    <div className="mx-auto max-w-lg p-4">
       <h1 className="mb-6 text-xl font-semibold">📊 สถิติของฉัน</h1>
 
       {/* Stats Cards */}

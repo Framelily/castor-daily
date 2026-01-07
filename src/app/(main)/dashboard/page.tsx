@@ -171,7 +171,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg p-4 pb-24">
+    <div className="mx-auto max-w-lg p-4">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-xl font-semibold">

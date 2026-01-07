@@ -1,4 +1,4 @@
-import { BottomNav } from '@/components/layout/BottomNav'
+import { TopNav } from '@/components/layout/TopNav'
 
 export default function MainLayout({
   children,
@@ -7,8 +7,8 @@ export default function MainLayout({
 }) {
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
-      <main className="flex-1 pb-20">{children}</main>
-      <BottomNav />
+      <TopNav />
+      <main className="flex-1 pt-16">{children}</main>
     </div>
   )
 }

@@ -112,7 +112,7 @@ export default function RoutinesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg p-4 pb-24">
+    <div className="mx-auto max-w-lg p-4">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-semibold">กิจวัตรของฉัน</h1>
         <Button
