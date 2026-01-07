@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Loader2, MoreHorizontal, SkipForward, RotateCcw, Plus } from 'lucide-react'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { getGreeting } from '@/lib/utils/greeting'
-import { getTodayTasks, updateTaskStatus, generateDailyTasks, createAdhocTask, getOverdueTasks } from '@/lib/actions/tasks'
+import { updateTaskStatus, createAdhocTask, loadDashboardData, getTodayTasks, getOverdueTasks } from '@/lib/actions/tasks'
 import type { Task, TimeSlot } from '@/types/database'
 import { OverdueAlert } from '@/components/dashboard/OverdueAlert'
 
@@ -51,11 +51,15 @@ export default function DashboardPage() {
     if (authLoading || hasInitialized.current) return
     hasInitialized.current = true
 
-    const loadDashboard = async () => {
+    const initDashboard = async () => {
       setGeneratingTasks(true)
       try {
-        await generateDailyTasks()
-        await fetchTasks()
+        // Single optimized action that generates + fetches in one call
+        const result = await loadDashboardData()
+        if (!result.error) {
+          setTasks(result.tasks)
+          setOverdueTasks(result.overdueTasks)
+        }
       } catch (error) {
         console.error('Error loading dashboard:', error)
       } finally {
@@ -65,8 +69,8 @@ export default function DashboardPage() {
     }
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadDashboard()
-  }, [authLoading, fetchTasks])
+    initDashboard()
+  }, [authLoading])
 
   const handleToggleTask = async (task: Task) => {
     const newStatus = task.status === 'completed' ? 'pending' : 'completed'

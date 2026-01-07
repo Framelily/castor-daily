@@ -141,25 +141,22 @@ export async function generateDailyTasks(dateStr?: string) {
   const targetDate = dateStr ? dayjs(dateStr) : dayjs()
   const formattedDate = targetDate.format('YYYY-MM-DD')
 
-  // Get user profile
+  // Fetch profile, templates, and existing tasks in parallel
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: profile, error: profileError } = await (supabase as any)
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  const sb = supabase as any
+  const [profileResult, templatesResult, existingTasksResult] = await Promise.all([
+    sb.from('profiles').select('*').eq('id', user.id).single(),
+    sb.from('task_templates').select('*').eq('user_id', user.id).eq('is_active', true),
+    sb.from('tasks').select('template_id').eq('user_id', user.id).eq('scheduled_date', formattedDate).eq('is_adhoc', false),
+  ])
+
+  const { data: profile, error: profileError } = profileResult
+  const { data: templates, error: templatesError } = templatesResult
+  const { data: existingTasks } = existingTasksResult
 
   if (profileError || !profile) {
     return { error: 'Profile not found', generated: 0 }
   }
-
-  // Get active templates
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: templates, error: templatesError } = await (supabase as any)
-    .from('task_templates')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
 
   if (templatesError) {
     return { error: templatesError.message, generated: 0 }
@@ -168,15 +165,6 @@ export async function generateDailyTasks(dateStr?: string) {
   if (!templates || templates.length === 0) {
     return { error: null, generated: 0 }
   }
-
-  // Check existing tasks for this date to avoid duplicates
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: existingTasks } = await (supabase as any)
-    .from('tasks')
-    .select('template_id')
-    .eq('user_id', user.id)
-    .eq('scheduled_date', formattedDate)
-    .eq('is_adhoc', false)
 
   const existingTemplateIds = new Set(
     (existingTasks ?? []).map((t: { template_id: string }) => t.template_id)
@@ -289,6 +277,89 @@ export async function getTaskStats(dateStr?: string): Promise<{
   return {
     total: tasks?.length ?? 0,
     ...stats,
+    error: null,
+  }
+}
+
+/**
+ * Combined action for Dashboard - generates tasks and fetches all data in one call
+ * Reduces multiple round trips to a single server action
+ */
+export async function loadDashboardData(dateStr?: string): Promise<{
+  tasks: Task[]
+  overdueTasks: Task[]
+  generated: number
+  error: string | null
+}> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { tasks: [], overdueTasks: [], generated: 0, error: 'Not authenticated' }
+  }
+
+  const targetDate = dateStr ? dayjs(dateStr) : dayjs()
+  const formattedDate = targetDate.format('YYYY-MM-DD')
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any
+
+  // Phase 1: Fetch all data needed for task generation in parallel
+  const [profileResult, templatesResult, existingTasksResult, overdueResult] = await Promise.all([
+    sb.from('profiles').select('*').eq('id', user.id).single(),
+    sb.from('task_templates').select('*').eq('user_id', user.id).eq('is_active', true),
+    sb.from('tasks').select('template_id').eq('user_id', user.id).eq('scheduled_date', formattedDate).eq('is_adhoc', false),
+    sb.from('tasks').select('*').eq('user_id', user.id).eq('status', 'pending').lt('scheduled_date', formattedDate).order('scheduled_date', { ascending: false }).limit(10),
+  ])
+
+  const { data: profile } = profileResult
+  const { data: templates } = templatesResult
+  const { data: existingTasks } = existingTasksResult
+  const overdueTasks: Task[] = overdueResult.data ?? []
+
+  // Generate new tasks if needed
+  let generated = 0
+  if (profile && templates && templates.length > 0) {
+    const existingTemplateIds = new Set(
+      (existingTasks ?? []).map((t: { template_id: string }) => t.template_id)
+    )
+
+    const tasksToInsert: TaskInsert[] = []
+
+    for (const template of templates as TaskTemplate[]) {
+      if (existingTemplateIds.has(template.id)) continue
+      if (!shouldGenerateTask(template, targetDate, profile)) continue
+
+      tasksToInsert.push({
+        user_id: user.id,
+        template_id: template.id,
+        title: template.title,
+        scheduled_date: formattedDate,
+        time_slot: template.time_slot,
+        status: 'pending',
+        is_adhoc: false,
+        completed_at: null,
+      })
+    }
+
+    if (tasksToInsert.length > 0) {
+      await sb.from('tasks').insert(tasksToInsert)
+      generated = tasksToInsert.length
+    }
+  }
+
+  // Phase 2: Fetch today's tasks (after generation)
+  const { data: todayTasks } = await sb
+    .from('tasks')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('scheduled_date', formattedDate)
+    .order('time_slot')
+
+  return {
+    tasks: todayTasks ?? [],
+    overdueTasks,
+    generated,
     error: null,
   }
 }

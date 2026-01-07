@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import type { TaskTemplateInsert, TaskTemplateUpdate, TaskTemplate, TaskTemplateWithCategory } from '@/types/database'
+import type { TaskTemplateInsert, TaskTemplateUpdate, TaskTemplate, TaskTemplateWithCategory, Category } from '@/types/database'
 
 export async function getTemplates(): Promise<{ templates: TaskTemplateWithCategory[]; error: string | null }> {
   const supabase = await createClient()
@@ -126,4 +126,35 @@ export async function deleteTemplate(id: string) {
   revalidatePath('/routines')
   revalidatePath('/dashboard')
   return { success: true }
+}
+
+/**
+ * Combined action for Routines page - fetches templates and categories in one call
+ */
+export async function loadRoutinesData(): Promise<{
+  templates: TaskTemplateWithCategory[]
+  categories: Category[]
+  error: string | null
+}> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { templates: [], categories: [], error: 'Not authenticated' }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any
+
+  // Fetch templates and categories in parallel
+  const [templatesResult, categoriesResult] = await Promise.all([
+    sb.from('task_templates').select('*, category:categories(*)').eq('user_id', user.id).order('created_at', { ascending: false }),
+    sb.from('categories').select('*').eq('user_id', user.id).order('sort_order'),
+  ])
+
+  return {
+    templates: templatesResult.data ?? [],
+    categories: categoriesResult.data ?? [],
+    error: templatesResult.error?.message || categoriesResult.error?.message || null,
+  }
 }

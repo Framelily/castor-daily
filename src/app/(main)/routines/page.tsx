@@ -5,8 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Plus, Loader2, Pencil, Trash2 } from 'lucide-react'
-import { getTemplates, toggleTemplate, deleteTemplate } from '@/lib/actions/templates'
-import { getCategories } from '@/lib/actions/categories'
+import { loadRoutinesData, toggleTemplate, deleteTemplate } from '@/lib/actions/templates'
 import type { TaskTemplateWithCategory, Category } from '@/types/database'
 import { RoutineDialog } from '@/components/routines/RoutineDialog'
 import { CategoryManager } from '@/components/routines/CategoryManager'
@@ -34,16 +33,11 @@ export default function RoutinesPage() {
   const hasInitialized = useRef(false)
 
   const fetchData = async () => {
-    const [templatesResult, categoriesResult] = await Promise.all([
-      getTemplates(),
-      getCategories(),
-    ])
-
-    if (!templatesResult.error) {
-      setTemplates(templatesResult.templates)
-    }
-    if (!categoriesResult.error) {
-      setCategories(categoriesResult.categories)
+    // Single optimized action that fetches both in one call
+    const result = await loadRoutinesData()
+    if (!result.error) {
+      setTemplates(result.templates)
+      setCategories(result.categories)
     }
     setLoading(false)
   }
